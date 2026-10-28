@@ -1,2 +1,0 @@
-# Доступ к hidraw HyperX Alloy Rise 75 (донгл и провод) для текущего пользователя (сессии)
-KERNEL=="hidraw*", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="01b9|0eb8", MODE="0660", TAG+="uaccess"

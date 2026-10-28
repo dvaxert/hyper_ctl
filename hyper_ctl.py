@@ -220,7 +220,7 @@ class Keyboard:
             found = [path] if path else find_devices()
             if not found:
                 sys.exit("LampArray-устройство не найдено")
-            sys.exit(f"Нет доступа к {', '.join(found)}. Установи udev-правило 70-hyperx.rules или запусти через sudo.")
+            sys.exit(f"Нет доступа к {', '.join(found)}. Запусти install.sh (он настроит udev-правило) или запусти через sudo.")
 
     @property
     def path(self):
