@@ -94,15 +94,15 @@ class Effect:
         return {}
 
 
-SPEED = {"name": "speed", "label": "Скорость", "type": "range", "min": 0.05, "max": 5, "step": 0.05, "default": 1}
-DIRECTION = {"name": "direction", "label": "Направление", "type": "select", "default": "right",
-             "options": [["right", "→ вправо"], ["left", "← влево"], ["down", "↓ вниз"], ["up", "↑ вверх"],
-                         ["out", "◎ от центра"], ["in", "◉ к центру"], ["diag", "↘ по диагонали"]]}
+SPEED = {"name": "speed", "label": "Speed", "type": "range", "min": 0.05, "max": 5, "step": 0.05, "default": 1}
+DIRECTION = {"name": "direction", "label": "Direction", "type": "select", "default": "right",
+             "options": [["right", "→ right"], ["left", "← left"], ["down", "↓ down"], ["up", "↑ up"],
+                         ["out", "◎ outward"], ["in", "◉ inward"], ["diag", "↘ diagonal"]]}
 
 
 @effect
 class Paint(Effect):
-    ID, TITLE = "paint", "Ручная раскраска"
+    ID, TITLE = "paint", "Custom paint"
     SCHEMA = [{"name": "colors", "type": "keymap", "default": {}}]
 
     def render(self, t, dt, ids):
@@ -116,8 +116,8 @@ class Paint(Effect):
 
 @effect
 class Solid(Effect):
-    ID, TITLE = "solid", "Сплошной цвет"
-    SCHEMA = [{"name": "color", "label": "Цвет", "type": "color", "default": "#ff0040"}]
+    ID, TITLE = "solid", "Solid color"
+    SCHEMA = [{"name": "color", "label": "Color", "type": "color", "default": "#ff0040"}]
 
     def render(self, t, dt, ids):
         c = hex_to_rgb(self.p("color"))
@@ -126,10 +126,10 @@ class Solid(Effect):
 
 @effect
 class Breathing(Effect):
-    ID, TITLE = "breathing", "Дыхание"
-    SCHEMA = [{"name": "colors", "label": "Цвета (по очереди)", "type": "colors", "default": ["#ff0040", "#0080ff"]},
+    ID, TITLE = "breathing", "Breathing"
+    SCHEMA = [{"name": "colors", "label": "Colors (in turn)", "type": "colors", "default": ["#ff0040", "#0080ff"]},
               {**SPEED, "default": 0.5},
-              {"name": "min", "label": "Минимум яркости", "type": "range", "min": 0, "max": 1, "step": 0.05, "default": 0}]
+              {"name": "min", "label": "Minimum brightness", "type": "range", "min": 0, "max": 1, "step": 0.05, "default": 0}]
 
     def render(self, t, dt, ids):
         phase = t * self.p("speed") * 0.5
@@ -142,9 +142,9 @@ class Breathing(Effect):
 
 @effect
 class Spectrum(Effect):
-    ID, TITLE = "spectrum", "Смена цветов"
+    ID, TITLE = "spectrum", "Color cycle"
     SCHEMA = [{**SPEED, "default": 0.3},
-              {"name": "colors", "label": "Цвета (пусто = радуга)", "type": "colors", "default": []}]
+              {"name": "colors", "label": "Colors (empty = rainbow)", "type": "colors", "default": []}]
 
     def render(self, t, dt, ids):
         k = t * self.p("speed") * 0.2
@@ -163,10 +163,10 @@ class Directional(Effect):
 
 @effect
 class Wave(Directional):
-    ID, TITLE = "wave", "Радужная волна"
+    ID, TITLE = "wave", "Rainbow wave"
     SCHEMA = [DIRECTION, SPEED,
-              {"name": "scale", "label": "Длина волны (клавиш)", "type": "range", "min": 2, "max": 40, "step": 1, "default": 16},
-              {"name": "saturation", "label": "Насыщенность", "type": "range", "min": 0, "max": 1, "step": 0.05, "default": 1}]
+              {"name": "scale", "label": "Wavelength (keys)", "type": "range", "min": 2, "max": 40, "step": 1, "default": 16},
+              {"name": "saturation", "label": "Saturation", "type": "range", "min": 0, "max": 1, "step": 0.05, "default": 1}]
 
     def render(self, t, dt, ids):
         lamps, scale, sat = self.engine.lamp_by_id, self.p("scale"), self.p("saturation")
@@ -176,10 +176,10 @@ class Wave(Directional):
 
 @effect
 class Gradient(Directional):
-    ID, TITLE = "gradient", "Градиент / цветная волна"
-    SCHEMA = [{"name": "colors", "label": "Цвета", "type": "colors", "default": ["#ff0080", "#7000ff", "#00c8ff"]},
+    ID, TITLE = "gradient", "Gradient / color wave"
+    SCHEMA = [{"name": "colors", "label": "Colors", "type": "colors", "default": ["#ff0080", "#7000ff", "#00c8ff"]},
               DIRECTION, {**SPEED, "min": 0, "default": 0.5},
-              {"name": "scale", "label": "Длина (клавиш)", "type": "range", "min": 2, "max": 40, "step": 1, "default": 18}]
+              {"name": "scale", "label": "Length (keys)", "type": "range", "min": 2, "max": 40, "step": 1, "default": 18}]
 
     def render(self, t, dt, ids):
         lamps, scale, cols = self.engine.lamp_by_id, self.p("scale"), self.colors()
@@ -189,10 +189,10 @@ class Gradient(Directional):
 
 @effect
 class Starlight(Effect):
-    ID, TITLE = "starlight", "Звёздное небо"
-    SCHEMA = [{"name": "colors", "label": "Цвета (пусто = случайные)", "type": "colors", "default": ["#ffffff", "#80c0ff"]},
-              {"name": "density", "label": "Плотность", "type": "range", "min": 0.1, "max": 10, "step": 0.1, "default": 3},
-              {"name": "fade", "label": "Длительность вспышки, с", "type": "range", "min": 0.2, "max": 5, "step": 0.1, "default": 1.5}]
+    ID, TITLE = "starlight", "Starlight"
+    SCHEMA = [{"name": "colors", "label": "Colors (empty = random)", "type": "colors", "default": ["#ffffff", "#80c0ff"]},
+              {"name": "density", "label": "Density", "type": "range", "min": 0.1, "max": 10, "step": 0.1, "default": 3},
+              {"name": "fade", "label": "Twinkle duration, s", "type": "range", "min": 0.2, "max": 5, "step": 0.1, "default": 1.5}]
 
     def __init__(self, engine):
         super().__init__(engine)
@@ -215,11 +215,11 @@ class Starlight(Effect):
 
 @effect
 class Rain(Effect):
-    ID, TITLE = "rain", "Дождь"
-    SCHEMA = [{"name": "colors", "label": "Цвета", "type": "colors", "default": ["#00ff60"]},
+    ID, TITLE = "rain", "Rain"
+    SCHEMA = [{"name": "colors", "label": "Colors", "type": "colors", "default": ["#00ff60"]},
               {**SPEED, "default": 1},
-              {"name": "density", "label": "Плотность", "type": "range", "min": 0.2, "max": 10, "step": 0.1, "default": 2},
-              {"name": "trail", "label": "Хвост (клавиш)", "type": "range", "min": 0.5, "max": 6, "step": 0.5, "default": 2.5}]
+              {"name": "density", "label": "Density", "type": "range", "min": 0.2, "max": 10, "step": 0.1, "default": 2},
+              {"name": "trail", "label": "Trail (keys)", "type": "range", "min": 0.5, "max": 6, "step": 0.5, "default": 2.5}]
 
     def __init__(self, engine):
         super().__init__(engine)
@@ -249,10 +249,10 @@ class Rain(Effect):
 
 @effect
 class Fire(Effect):
-    ID, TITLE = "fire", "Огонь"
-    SCHEMA = [{"name": "colors", "label": "Цвета (снизу вверх)", "type": "colors", "default": ["#ff2000", "#ff8000", "#ffd040"]},
+    ID, TITLE = "fire", "Fire"
+    SCHEMA = [{"name": "colors", "label": "Colors (bottom to top)", "type": "colors", "default": ["#ff2000", "#ff8000", "#ffd040"]},
               {**SPEED, "default": 1},
-              {"name": "height", "label": "Высота пламени", "type": "range", "min": 0.2, "max": 2, "step": 0.05, "default": 1}]
+              {"name": "height", "label": "Flame height", "type": "range", "min": 0.2, "max": 2, "step": 0.05, "default": 1}]
 
     def render(self, t, dt, ids):
         e, lamps, cols = self.engine, self.engine.lamp_by_id, self.colors()
@@ -270,9 +270,9 @@ class Fire(Effect):
 
 @effect
 class Reactive(Effect):
-    ID, TITLE, REACTIVE = "reactive", "Подсветка нажатий", True
-    SCHEMA = [{"name": "colors", "label": "Цвета (пусто = случайные)", "type": "colors", "default": ["#ffffff"]},
-              {"name": "fade", "label": "Затухание, с", "type": "range", "min": 0.1, "max": 5, "step": 0.1, "default": 0.8}]
+    ID, TITLE, REACTIVE = "reactive", "Reactive keys", True
+    SCHEMA = [{"name": "colors", "label": "Colors (empty = random)", "type": "colors", "default": ["#ffffff"]},
+              {"name": "fade", "label": "Fade, s", "type": "range", "min": 0.1, "max": 5, "step": 0.1, "default": 0.8}]
 
     def __init__(self, engine):
         super().__init__(engine)
@@ -295,11 +295,11 @@ class Reactive(Effect):
 
 @effect
 class Ripple(Effect):
-    ID, TITLE, REACTIVE = "ripple", "Волна от нажатия", True
-    SCHEMA = [{"name": "colors", "label": "Цвета (пусто = радуга)", "type": "colors", "default": ["#00e5ff"]},
+    ID, TITLE, REACTIVE = "ripple", "Ripple", True
+    SCHEMA = [{"name": "colors", "label": "Colors (empty = rainbow)", "type": "colors", "default": ["#00e5ff"]},
               {**SPEED, "default": 1},
-              {"name": "width", "label": "Ширина кольца (клавиш)", "type": "range", "min": 0.5, "max": 4, "step": 0.25, "default": 1.25},
-              {"name": "radius", "label": "Радиус (клавиш)", "type": "range", "min": 2, "max": 20, "step": 0.5, "default": 8}]
+              {"name": "width", "label": "Ring width (keys)", "type": "range", "min": 0.5, "max": 4, "step": 0.25, "default": 1.25},
+              {"name": "radius", "label": "Radius (keys)", "type": "range", "min": 2, "max": 20, "step": 0.5, "default": 8}]
 
     def __init__(self, engine):
         super().__init__(engine)
@@ -331,10 +331,10 @@ class Ripple(Effect):
 
 @effect
 class Heatmap(Effect):
-    ID, TITLE, REACTIVE = "heatmap", "Тепловая карта набора", True
-    SCHEMA = [{"name": "colors", "label": "Шкала (холодно → горячо)", "type": "colors",
+    ID, TITLE, REACTIVE = "heatmap", "Typing heatmap", True
+    SCHEMA = [{"name": "colors", "label": "Scale (cold → hot)", "type": "colors",
                "default": ["#0010ff", "#00ffa0", "#ffff00", "#ff0000"]},
-              {"name": "decay", "label": "Остывание, с", "type": "range", "min": 2, "max": 120, "step": 1, "default": 20}]
+              {"name": "decay", "label": "Cool-down, s", "type": "range", "min": 2, "max": 120, "step": 1, "default": 20}]
 
     def __init__(self, engine):
         super().__init__(engine)

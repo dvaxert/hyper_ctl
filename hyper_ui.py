@@ -11,40 +11,38 @@ import signal
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 
 import effects as fx
-from hyper_ctl import KEY_NAMES, Keyboard, Lamp, lamp_groups, name_lamps
+from hyper_ctl import Keyboard, Lamp, lamp_groups, name_lamps
 
 U = fx.U
 
-DEMO_ROWS = [
-    ["esc", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", None, "delete"],
-    ["grave", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "minus", "equal", ("backspace", 2), "home"],
-    [("tab", 1.5), "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "lbracket", "rbracket", ("backslash", 1.5), "pageup"],
-    [("capslock", 1.75), "a", "s", "d", "f", "g", "h", "j", "k", "l", "semicolon", "quote", ("enter", 2.25), "pagedown"],
-    [("lshift", 2.25), "z", "x", "c", "v", "b", "n", "m", "comma", "dot", "slash", ("rshift", 1.75), "up", "end"],
-    [("lctrl", 1.25), ("lmeta", 1.25), ("lalt", 1.25), ("space", 6.25 / 3), ("space", 6.25 / 3), ("space", 6.25 / 3),
-     ("ralt", 1.25), (None, 1.25), "left", "down", "right"],
-]
+DEMO_LAYOUT = (  # x, y (в 0.1 мм), HID usage — снято с HyperX Alloy Rise 75
+    "180,151,41 418,152,58 609,152,59 799,152,60 990,152,61 1228,152,62 1418,152,63 1609,152,64 1799,152,65 "
+    "2037,152,66 2228,152,67 2418,152,68 2609,152,69 2847,152,104 180,406,53 371,406,30 561,406,31 752,406,32 "
+    "942,406,33 1133,406,34 1323,406,35 1514,406,36 1704,406,37 1895,406,38 2085,406,39 2276,406,45 2466,406,46 "
+    "2752,406,42 3085,406,74 228,597,43 466,597,20 656,597,26 847,597,8 1037,597,21 1228,597,23 1418,597,28 "
+    "1609,597,24 1799,597,12 1990,597,18 2180,597,19 2371,597,47 2561,597,48 2799,597,49 3085,597,75 252,787,57 "
+    "514,787,4 704,787,22 895,787,7 1085,787,9 1276,787,10 1466,787,11 1657,787,13 1847,787,14 2038,787,15 "
+    "2228,787,51 2419,787,52 2728,787,40 3085,787,78 299,978,225 609,978,29 799,978,27 990,978,6 1180,978,25 "
+    "1371,978,5 1561,978,17 1752,978,16 1942,978,54 2133,978,55 2323,978,56 2585,978,229 2847,978,82 204,1168,224 "
+    "442,1168,227 680,1168,226 1050,1168,44 1395,1168,44 1740,1168,44 2109,1168,230 2347,1168,175 2657,1168,80 "
+    "2847,1168,81 3038,1168,79 82,743,0 97,633,0 97,548,0 97,443,0 97,353,0 87,243,0 97,143,0 3184,743,0 3168,632,0 "
+    "3168,543,0 3168,443,0 3168,353,0 3168,243,0 3168,143,0 "
+)
 
 
 class DemoKeyboard:
-    """Фейковая клавиатура для проверки UI без устройства."""
+    """Фейковая клавиатура с раскладкой Alloy Rise 75 для проверки UI без устройства."""
     interval = 1 / 30
-    path = "demo"
+    path = "HyperX Alloy Rise 75 (demo)"
 
     def __init__(self):
-        codes = {v: k for k, v in KEY_NAMES.items()}
         self.lamps = []
-        for row, keys in enumerate(DEMO_ROWS):
-            x = 0.5
-            for k in keys:
-                name, w = k if isinstance(k, tuple) else (k, 1)
-                self.lamps.append(Lamp(len(self.lamps), int((x + w / 2) * U), int((row + 0.8) * U), True, codes.get(name, 0)))
-                x += w
-        for side_x in (0.25, 17.2):
-            for j in range(7):
-                self.lamps.append(Lamp(len(self.lamps), int(side_x * U), int((0.75 + j * 0.55) * U), True, 0))
+        for i, item in enumerate(DEMO_LAYOUT.split()):
+            x, y, usage = map(int, item.split(","))
+            self.lamps.append(Lamp(i, x * 100, y * 100, True, usage))
         name_lamps(self.lamps)
         self.count = len(self.lamps)
 
@@ -56,7 +54,7 @@ class DemoKeyboard:
 
 def preset_path(name):
     if not re.fullmatch(r"[\w\- ]{1,40}", name):
-        raise ValueError("Имя профиля: буквы, цифры, пробел, - и _ (до 40 символов)")
+        raise ValueError("Profile name: letters, digits, space, - and _ (up to 40 chars)")
     return os.path.join(fx.PRESETS_DIR, name + ".json")
 
 
@@ -68,7 +66,7 @@ def list_presets():
 
 
 PAGE = r"""<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HyperX Control</title>
 <style>
 :root{--bg:#121317;--panel:#1c1e24;--panel2:#24272f;--key:#2b2e37;--line:#33363f;--text:#e8e8ec;--muted:#8b8f99;--accent:#e2234a;--ok:#2fbf71}
@@ -85,6 +83,7 @@ h1 b{color:var(--accent)}
 .seg{display:inline-flex;background:var(--panel);border-radius:9px;padding:3px}
 .seg button{background:none;padding:6px 12px}
 .seg button.on{background:var(--accent)}
+#lang button{padding:6px 9px;font-size:12px;font-weight:600}
 button{background:var(--panel2);color:var(--text);border:0;border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer;white-space:nowrap}
 button:hover{background:#30343e}
 button.primary{background:var(--accent)}
@@ -113,6 +112,7 @@ label.inline{display:flex;align-items:center;gap:8px;color:var(--muted)}
 @media(max-width:860px){.cols{grid-template-columns:1fr}}
 .card{background:var(--panel);border-radius:14px;padding:14px}
 .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.card h2 .note{text-transform:none;letter-spacing:0}
 .layer{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:9px;cursor:pointer;border:1px solid transparent}
 .layer:hover{background:var(--panel2)}
 .layer.cur{background:var(--panel2);border-color:var(--accent)}
@@ -143,33 +143,34 @@ label.inline{display:flex;align-items:center;gap:8px;color:var(--muted)}
   <h1>Hyper<b>X</b> Control</h1>
   <span class="dev" id="dev"><i></i><span></span></span>
   <span class="grow"></span>
-  <label class="inline">Яркость <input type="range" id="bright" min="0" max="1" step="0.01" style="width:140px"> <b id="brightv"></b></label>
-  <div class="seg" id="mode"><button data-m="custom">Свои эффекты</button><button data-m="hardware">Встроенные</button></div>
+  <label class="inline"><span data-i18n>Brightness</span> <input type="range" id="bright" min="0" max="1" step="0.01" style="width:140px"> <b id="brightv"></b></label>
+  <div class="seg" id="mode"><button data-m="custom" data-i18n>Custom effects</button><button data-m="hardware" data-i18n>Built-in</button></div>
+  <div class="seg" id="lang"><button data-l="en">EN</button><button data-l="ru">RU</button></div>
 </header>
 
-<div id="kb"><div id="keys"></div><div id="hwnote">Подсветкой управляет сама клавиатура (встроенные эффекты)</div></div>
+<div id="kb"><div id="keys"></div><div id="hwnote" data-i18n>Lighting is controlled by the keyboard itself (built-in effects)</div></div>
 <div class="quick">
-  <span class="lbl">Выделить:</span>
-  <button class="small" data-sel="all">Всё</button><button class="small" data-sel="keys">Клавиши</button>
-  <button class="small" data-sel="letters">Буквы</button><button class="small" data-sel="digits">Цифры</button>
+  <span class="lbl" data-i18n>Select:</span>
+  <button class="small" data-sel="all" data-i18n>All</button><button class="small" data-sel="keys" data-i18n>Keys</button>
+  <button class="small" data-sel="letters" data-i18n>Letters</button><button class="small" data-sel="digits" data-i18n>Digits</button>
   <button class="small" data-sel="fkeys">F1–F12</button><button class="small" data-sel="wasd">WASD</button>
-  <button class="small" data-sel="arrows">Стрелки</button><button class="small" data-sel="mods">Модификаторы</button>
-  <button class="small" data-sel="bars">Боковые полосы</button><button class="small" data-sel="none">Снять</button>
+  <button class="small" data-sel="arrows" data-i18n>Arrows</button><button class="small" data-sel="mods" data-i18n>Modifiers</button>
+  <button class="small" data-sel="bars" data-i18n>Side bars</button><button class="small" data-sel="none" data-i18n>Clear</button>
   <span class="muted" id="selinfo"></span>
 </div>
 
 <div class="cols">
   <div>
     <div class="card">
-      <h2>Слои <span class="muted" style="text-transform:none;letter-spacing:0">(верхний перекрывает нижние)</span></h2>
+      <h2><span data-i18n>Layers</span> <span class="muted note" data-i18n>(top covers the ones below)</span></h2>
       <div id="layers"></div>
-      <div class="addrow"><select id="addfx"></select><button id="add">+ Слой</button></div>
+      <div class="addrow"><select id="addfx"></select><button id="add" data-i18n>+ Layer</button></div>
     </div>
     <div class="card" style="margin-top:16px">
-      <h2>Профили</h2>
-      <div class="row"><select id="presets" style="flex:1"></select><button id="pload">Загрузить</button></div>
-      <div class="row" style="margin-top:8px"><button id="psave">Сохранить как…</button><button id="pdel">Удалить</button></div>
-      <div class="row" style="margin-top:8px"><button id="export">Экспорт JSON</button><button id="import">Импорт</button>
+      <h2 data-i18n>Profiles</h2>
+      <div class="row"><select id="presets" style="flex:1"></select><button id="pload" data-i18n>Load</button></div>
+      <div class="row" style="margin-top:8px"><button id="psave" data-i18n>Save as…</button><button id="pdel" data-i18n>Delete</button></div>
+      <div class="row" style="margin-top:8px"><button id="export" data-i18n>Export JSON</button><button id="import" data-i18n>Import</button>
         <input type="file" id="file" accept=".json" hidden></div>
     </div>
   </div>
@@ -177,9 +178,76 @@ label.inline{display:flex;align-items:center;gap:8px;color:var(--muted)}
 </div>
 <div id="status"></div>
 </main><script>
+const RU={
+  "Brightness":"Яркость","Custom effects":"Свои эффекты","Built-in":"Встроенные",
+  "Lighting is controlled by the keyboard itself (built-in effects)":"Подсветкой управляет сама клавиатура (встроенные эффекты)",
+  "Select:":"Выделить:","All":"Всё","Keys":"Клавиши","Letters":"Буквы","Digits":"Цифры","Arrows":"Стрелки","Modifiers":"Модификаторы",
+  "Side bars":"Боковые полосы","Clear":"Снять","Layers":"Слои","(top covers the ones below)":"(верхний перекрывает нижние)",
+  "+ Layer":"+ Слой","Profiles":"Профили","Load":"Загрузить","Save as…":"Сохранить как…","Delete":"Удалить",
+  "Export JSON":"Экспорт JSON","Import":"Импорт","selected: {n}":"выделено: {n}","keyboard not connected":"клавиатура не подключена",
+  "{n} keys painted":"раскрашено клавиш: {n}","{n} keys":"клавиш: {n}","add":"сложение","multiply":"умножение",
+  "Up":"Выше","Down":"Ниже","Remove":"Удалить","No layers — add an effect below":"Слоёв нет — добавь эффект ниже",
+  "Selected ({n})":"Выделенные ({n})","Selected (select keys first)":"Выделенные (выдели клавиши)",
+  "Select some keys first":"Сначала выдели клавиши","Layer":"Слой","Pick a layer on the left":"Выбери слой слева",
+  " · reacts to key presses":" · реагирует на нажатия","Color":"Цвет","Paint selected":"Покрасить выделенные",
+  "Erase from selected":"Стереть с выделенных","Clear layer":"Очистить слой",
+  "Select keys on the keyboard (click, Shift+click or drag), then press “Paint selected”. Double-click a key to paint it right away. Unpainted keys are transparent — lower layers show through.":
+    "Выдели клавиши на клавиатуре (клик, Shift+клик, протяжка), затем «Покрасить выделенные». Двойной клик по клавише — покрасить сразу. Нераскрашенные клавиши прозрачны — сквозь них видно нижние слои.",
+  "Show area":"Показать область","Applies to":"Где применяется","Opacity":"Непрозрачность","Blending":"Смешивание",
+  "Normal (covers)":"Обычное (перекрывает)","Add (brightens)":"Сложение (подсвечивает)","Multiply (mask)":"Умножение (маска)",
+  "Right-click a color to remove":"ПКМ по цвету — удалить","Reset parameters":"Сбросить параметры",
+  "— no saved profiles —":"— нет сохранённых —","Profile name:":"Название профиля:","My profile":"Мой профиль",
+  "Saved: {n}":"Сохранено: {n}","Loaded: {n}":"Загружен: {n}","Delete profile “{n}”?":"Удалить профиль «{n}»?",
+  "Imported":"Импортировано","Could not read the file":"Не удалось прочитать файл","Error: ":"Ошибка: ",
+  "Speed":"Скорость",
+  "Direction":"Направление",
+  "→ right":"→ вправо",
+  "← left":"← влево",
+  "↓ down":"↓ вниз",
+  "↑ up":"↑ вверх",
+  "◎ outward":"◎ от центра",
+  "◉ inward":"◉ к центру",
+  "↘ diagonal":"↘ по диагонали",
+  "Custom paint":"Ручная раскраска",
+  "Solid color":"Сплошной цвет",
+  "Color":"Цвет",
+  "Breathing":"Дыхание",
+  "Colors (in turn)":"Цвета (по очереди)",
+  "Minimum brightness":"Минимум яркости",
+  "Color cycle":"Смена цветов",
+  "Colors (empty = rainbow)":"Цвета (пусто = радуга)",
+  "Rainbow wave":"Радужная волна",
+  "Wavelength (keys)":"Длина волны (клавиш)",
+  "Saturation":"Насыщенность",
+  "Gradient / color wave":"Градиент / цветная волна",
+  "Colors":"Цвета",
+  "Length (keys)":"Длина (клавиш)",
+  "Starlight":"Звёздное небо",
+  "Colors (empty = random)":"Цвета (пусто = случайные)",
+  "Density":"Плотность",
+  "Twinkle duration, s":"Длительность вспышки, с",
+  "Rain":"Дождь",
+  "Trail (keys)":"Хвост (клавиш)",
+  "Fire":"Огонь",
+  "Colors (bottom to top)":"Цвета (снизу вверх)",
+  "Flame height":"Высота пламени",
+  "Reactive keys":"Подсветка нажатий",
+  "Fade, s":"Затухание, с",
+  "Ripple":"Волна от нажатия",
+  "Ring width (keys)":"Ширина кольца (клавиш)",
+  "Radius (keys)":"Радиус (клавиш)",
+  "Typing heatmap":"Тепловая карта набора",
+  "Scale (cold → hot)":"Шкала (холодно → горячо)",
+  "Cool-down, s":"Остывание, с",
+};
+const LANGKEY="hyper_ctl.lang";
+let lang="en";try{lang=localStorage.getItem(LANGKEY)||"en"}catch(e){}
+lang=new URLSearchParams(location.search).get("lang")||lang;
+const t=(s,n)=>{const r=lang==="ru"?(RU[s]??s):s;return n===undefined?r:r.replaceAll("{n}",n)};
+
 const $=id=>document.getElementById(id);
 let S=null, P=null, cur=null, sel=new Set(), drag=false, paintColor="#ff0040";
-const FX={}; const NAME={};
+const FX={};
 const LABEL={esc:"Esc",backspace:"⌫ Back",tab:"Tab",capslock:"Caps",enter:"Enter",lshift:"Shift",rshift:"Shift",lctrl:"Ctrl",rctrl:"Ctrl",
   lalt:"Alt",ralt:"Alt",lmeta:"Win",rmeta:"Win",fn:"Fn",up:"↑",down:"↓",left:"←",right:"→",delete:"Del",home:"Home",end:"End",
   pageup:"PgUp",pagedown:"PgDn",printscreen:"PrtSc",insert:"Ins",grave:"`",minus:"-",equal:"=",lbracket:"[",rbracket:"]",
@@ -188,16 +256,16 @@ const WIDTH={backspace:2,tab:1.5,backslash:1.5,capslock:1.75,enter:2.25,lshift:2
   ralt:1.25,rctrl:1.25,rmeta:1.25,fn:1.25};
 const label=n=>n.startsWith("space")?"":(LABEL[n]??(/^lamp\d+$/.test(n)?"•":n.toUpperCase()));
 const SWATCHES=["#ff0000","#ff6a00","#ffd400","#00ff40","#00e5ff","#0050ff","#8a00ff","#ff00c8","#ffffff","#000000"];
-const TARGETS=[["all","Всё"],["keys","Клавиши"],["bars","Полосы"]];
+const TARGETS=[["all","All"],["keys","Keys"],["bars","Side bars"]];
 
-function toast(t){const s=$("status");s.textContent=t;s.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>s.classList.remove("show"),1800)}
+function toast(m){const s=$("status");s.textContent=m;s.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>s.classList.remove("show"),1800)}
 async function api(path,body,method){const r=await fetch(path,{method:method||(body?"POST":"GET"),body:body&&JSON.stringify(body)});
-  if(!r.ok){const t=await r.text();toast("Ошибка: "+t);throw new Error(t)}return r.json()}
+  if(!r.ok){const m=await r.text();toast(t("Error: ")+m);throw new Error(m)}return r.json()}
 let saveT;function save(){clearTimeout(saveT);saveT=setTimeout(()=>api("/api/profile",P),80)}
 const curLayer=()=>P.layers.find(l=>l.id===cur);
 const isBar=l=>/^[lr]bar\d/.test(l.name);
 
-// ---------- клавиатура ----------
+// ---------- keyboard ----------
 function layout(){
   const lamps=S.lamps, keys=lamps.filter(l=>!isBar(l)), bars=lamps.filter(isBar);
   const rows={};for(const l of keys)(rows[Math.round(l.y/(U/2))]??=[]).push(l);
@@ -208,7 +276,7 @@ function layout(){
     if(sp.length){const mid=sp.reduce((s,l)=>s+l.x,0)/sp.length,tot=6.25*U,w=tot/sp.length;
       sp.forEach((l,i)=>{l.w=w;l.cx=mid-tot/2+w*(i+.5)})}
     for(const l of r)l.cx??=l.x;
-    for(let i=0;i+1<r.length;i++){const a=r[i],b=r[i+1],ov=(a.cx+a.w/2)-(b.cx-b.w/2);   // убрать перекрытия
+    for(let i=0;i+1<r.length;i++){const a=r[i],b=r[i+1],ov=(a.cx+a.w/2)-(b.cx-b.w/2);   // remove overlaps
       if(ov>1){a.w-=ov/2;a.cx-=ov/4;b.w-=ov/2;b.cx+=ov/4}}
   }
   const minX=Math.min(...keys.map(l=>l.cx-l.w/2)),maxX=Math.max(...keys.map(l=>l.cx+l.w/2));
@@ -218,7 +286,7 @@ function layout(){
   $("keys").style.width=box+"px";$("keys").style.height=(maxY-minY)*s+"px";
   for(const l of keys)Object.assign(l.el.style,{left:(l.cx-l.w/2-ox)*s+g/2+"px",top:(l.y-U/2-minY)*s+g/2+"px",width:l.w*s-g+"px",height:U*s-g+"px"});
   const segH=bars.length?((maxY-minY)-U*.3)/7:0;
-  for(const l of bars){const left=l.name[0]==="l", k=+l.name.slice(4)-1;  // lbar1/rbar1 — нижний сегмент
+  for(const l of bars){const left=l.name[0]==="l", k=+l.name.slice(4)-1;  // lbar1/rbar1 is the bottom segment
     Object.assign(l.el.style,{left:((left?bx0:maxX+PAD)-ox)*s+"px",top:((maxY-U*.15-(k+1)*segH)-minY)*s+2+"px",width:BAR*s+"px",height:segH*s-4+"px"})}
 }
 function buildKeys(){
@@ -229,7 +297,7 @@ function buildKeys(){
     el.ondblclick=()=>{const L=curLayer();if(L?.effect==="paint"){paintSel(paintColor)}}}
   onmouseup=()=>drag=false;onresize=layout;layout()}
 function drawSel(){for(const l of S.lamps)l.el.classList.toggle("sel",sel.has(l.id));
-  $("selinfo").textContent=sel.size?`выделено: ${sel.size}`:"";if(curLayer())drawTargetInfo()}
+  $("selinfo").textContent=sel.size?t("selected: {n}",sel.size):"";if(curLayer())drawTargetInfo()}
 document.querySelectorAll("[data-sel]").forEach(b=>b.onclick=()=>{sel.clear();const g=b.dataset.sel;if(g!=="none")S.groups[g].forEach(i=>sel.add(i));drawSel()});
 
 let frameBusy=false;
@@ -238,18 +306,18 @@ async function pollFrame(){
     try{const f=await api("/api/frame");
       for(const l of S.lamps){const c=f.colors[l.id];l.el.querySelector(".glow").style.background=c==="#000000"?"none":
         `radial-gradient(circle at 50% 35%,${c} 0%,${c}cc 55%,${c}66 100%)`}
-      const d=$("dev");d.classList.toggle("off",!f.devices);d.querySelector("span").textContent=f.devices||"клавиатура не подключена";
+      const d=$("dev");d.classList.toggle("off",!f.devices);d.querySelector("span").textContent=f.devices||t("keyboard not connected");
     }catch(e){}frameBusy=false}
   setTimeout(pollFrame,50)}
 
-// ---------- слои ----------
-function targetText(L){const k=L.keys||["all"];if(L.effect==="paint")return Object.keys(L.params.colors||{}).length+" клавиш раскрашено";
-  const t=TARGETS.find(t=>t[0]===k[0]&&k.length===1);return t?t[1]:`${k.length} клавиш`}
+// ---------- layers ----------
+function targetText(L){const k=L.keys||["all"];if(L.effect==="paint")return t("{n} keys painted",Object.keys(L.params.colors||{}).length);
+  const tg=TARGETS.find(x=>x[0]===k[0]&&k.length===1);return tg?t(tg[1]):t("{n} keys",k.length)}
 function drawLayers(){
   const box=$("layers");box.innerHTML="";
   [...P.layers].reverse().forEach(L=>{const d=document.createElement("div");d.className="layer"+(L.id===cur?" cur":"")+(L.enabled?"":" dis");
-    d.innerHTML=`<div class="tog ${L.enabled?"on":""}"></div><div class="lname">${FX[L.effect]?.title||L.effect}<small>${targetText(L)}${L.blend!=="normal"?" · "+(L.blend==="add"?"сложение":"умножение"):""}${L.opacity<1?" · "+Math.round(L.opacity*100)+"%":""}</small></div>
-      <button class="icon" data-a="up" title="Выше">▲</button><button class="icon" data-a="down" title="Ниже">▼</button><button class="icon" data-a="del" title="Удалить">✕</button>`;
+    d.innerHTML=`<div class="tog ${L.enabled?"on":""}"></div><div class="lname">${t(FX[L.effect]?.title||L.effect)}<small>${targetText(L)}${L.blend!=="normal"?" · "+t(L.blend):""}${L.opacity<1?" · "+Math.round(L.opacity*100)+"%":""}</small></div>
+      <button class="icon" data-a="up" title="${t("Up")}">▲</button><button class="icon" data-a="down" title="${t("Down")}">▼</button><button class="icon" data-a="del" title="${t("Remove")}">✕</button>`;
     d.onclick=e=>{const a=e.target.dataset.a,i=P.layers.indexOf(L);
       if(e.target.classList.contains("tog")){L.enabled=!L.enabled}
       else if(a==="up"&&i<P.layers.length-1){P.layers.splice(i,1);P.layers.splice(i+1,0,L)}
@@ -258,7 +326,7 @@ function drawLayers(){
       else cur=L.id;
       save();drawLayers();drawEditor()};
     box.append(d)});
-  if(!P.layers.length)box.innerHTML='<div class="muted">Слоёв нет — добавь эффект ниже</div>'}
+  if(!P.layers.length)box.innerHTML=`<div class="muted">${t("No layers — add an effect below")}</div>`}
 
 function field(title,valueText,inner){const d=document.createElement("div");d.className="field";
   d.innerHTML=`<div class="t"><span>${title}</span><b>${valueText??""}</b></div>`;d.append(inner);return d}
@@ -271,76 +339,86 @@ function colorList(list,on){const w=document.createElement("div");w.className="c
     const rm=document.createElement("button");rm.className="small";rm.textContent="−";rm.onclick=()=>{list.pop();on();redraw()};w.append(add,rm)};
   redraw();return w}
 
-function drawTargetInfo(){const b=$("tsel");if(b)b.textContent=sel.size?`Выделенные (${sel.size})`:"Выделенные (выдели клавиши)"}
-function paintSel(c){const L=curLayer();if(!sel.size)return toast("Сначала выдели клавиши");
+function drawTargetInfo(){const b=$("tsel");if(b)b.textContent=sel.size?t("Selected ({n})",sel.size):t("Selected (select keys first)")}
+function paintSel(c){const L=curLayer();if(!sel.size)return toast(t("Select some keys first"));
   L.params.colors??={};for(const i of sel){const n=S.lamps[i].name;if(c===null)delete L.params.colors[n];else L.params.colors[n]=c}save();drawLayers()}
 
 function drawEditor(){
   const E=$("editor");E.innerHTML="";const L=curLayer();
-  if(!L){E.innerHTML='<h2>Слой</h2><div class="muted">Выбери слой слева</div>';return}
+  if(!L){E.innerHTML=`<h2>${t("Layer")}</h2><div class="muted">${t("Pick a layer on the left")}</div>`;return}
   const F=FX[L.effect];L.params??={};
-  const h=document.createElement("h2");h.textContent=F.title+(F.reactive?" · реагирует на нажатия":"");E.append(h);
+  const h=document.createElement("h2");h.textContent=t(F.title)+(F.reactive?t(" · reacts to key presses"):"");E.append(h);
 
   if(L.effect==="paint"){
     const w=document.createElement("div");w.className="row";
     const ci=document.createElement("input");ci.type="color";ci.value=paintColor;ci.oninput=()=>paintColor=ci.value;w.append(ci);
     SWATCHES.forEach(c=>{const s=document.createElement("div");s.className="sw";s.style.background=c;s.onclick=()=>{paintColor=c;ci.value=c};w.append(s)});
-    E.append(field("Цвет",null,w));
+    E.append(field(t("Color"),null,w));
     const b=document.createElement("div");b.className="row";
-    b.innerHTML='<button class="primary" id="pp">Покрасить выделенные</button><button id="pe">Стереть с выделенных</button><button id="pc">Очистить слой</button>';
+    b.innerHTML=`<button class="primary" id="pp">${t("Paint selected")}</button><button id="pe">${t("Erase from selected")}</button><button id="pc">${t("Clear layer")}</button>`;
     E.append(b);
     $("pp").onclick=()=>paintSel(paintColor);$("pe").onclick=()=>paintSel(null);
     $("pc").onclick=()=>{L.params.colors={};save();drawLayers()};
-    const hn=document.createElement("div");hn.className="hint";hn.textContent="Выдели клавиши на клавиатуре (клик, Shift+клик, протяжка), затем «Покрасить». Двойной клик по клавише — покрасить сразу. Нераскрашенные клавиши прозрачны — сквозь них видно нижние слои.";
+    const hn=document.createElement("div");hn.className="hint";
+    hn.textContent=t("Select keys on the keyboard (click, Shift+click or drag), then press “Paint selected”. Double-click a key to paint it right away. Unpainted keys are transparent — lower layers show through.");
     E.append(hn)
   }else{
     const chips=document.createElement("div");chips.className="chips";
-    for(const [k,t] of TARGETS){const b=document.createElement("button");b.className="small"+((L.keys||["all"]).join()===k?" on":"");b.textContent=t;
+    for(const [k,name] of TARGETS){const b=document.createElement("button");b.className="small"+((L.keys||["all"]).join()===k?" on":"");b.textContent=t(name);
       b.onclick=()=>{L.keys=[k];save();drawLayers();drawEditor()};chips.append(b)}
-    const bs=document.createElement("button");bs.className="small"+(!TARGETS.some(t=>(L.keys||["all"]).join()===t[0])?" on":"");bs.id="tsel";
-    bs.onclick=()=>{if(!sel.size)return toast("Сначала выдели клавиши");L.keys=[...sel].map(i=>S.lamps[i].name);save();drawLayers();drawEditor()};chips.append(bs);
-    const show=document.createElement("button");show.className="small";show.textContent="Показать область";
+    const bs=document.createElement("button");bs.className="small"+(!TARGETS.some(x=>(L.keys||["all"]).join()===x[0])?" on":"");bs.id="tsel";
+    bs.onclick=()=>{if(!sel.size)return toast(t("Select some keys first"));L.keys=[...sel].map(i=>S.lamps[i].name);save();drawLayers();drawEditor()};chips.append(bs);
+    const show=document.createElement("button");show.className="small";show.textContent=t("Show area");
     show.onclick=()=>{sel=new Set(S.resolve(L.keys||["all"]));drawSel()};chips.append(show);
-    E.append(field("Где применяется",targetText(L),chips));drawTargetInfo()}
+    E.append(field(t("Applies to"),targetText(L),chips));drawTargetInfo()}
 
   const g=document.createElement("div");g.className="grid2";
-  g.append(field("Непрозрачность",Math.round(L.opacity*100)+"%",rangeInput(L.opacity,0,1,0.01,v=>{L.opacity=v;save();drawLayers()},v=>Math.round(v*100)+"%")));
-  const bl=document.createElement("select");[["normal","Обычное (перекрывает)"],["add","Сложение (подсвечивает)"],["multiply","Умножение (маска)"]].forEach(([v,t])=>bl.add(new Option(t,v,false,L.blend===v)));
-  bl.onchange=()=>{L.blend=bl.value;save();drawLayers()};g.append(field("Смешивание",null,bl));E.append(g);
+  g.append(field(t("Opacity"),Math.round(L.opacity*100)+"%",rangeInput(L.opacity,0,1,0.01,v=>{L.opacity=v;save();drawLayers()},v=>Math.round(v*100)+"%")));
+  const bl=document.createElement("select");[["normal","Normal (covers)"],["add","Add (brightens)"],["multiply","Multiply (mask)"]].forEach(([v,n])=>bl.add(new Option(t(n),v,false,L.blend===v)));
+  bl.onchange=()=>{L.blend=bl.value;save();drawLayers()};g.append(field(t("Blending"),null,bl));E.append(g);
 
   for(const sc of F.schema){if(sc.type==="keymap")continue;
     const v=L.params[sc.name]??structuredClone(sc.default);
-    if(sc.type==="range")E.append(field(sc.label,v,rangeInput(v,sc.min,sc.max,sc.step,x=>{L.params[sc.name]=x;save()},x=>x)));
-    else if(sc.type==="color"){const c=document.createElement("input");c.type="color";c.value=v;c.oninput=()=>{L.params[sc.name]=c.value;save()};E.append(field(sc.label,null,c))}
-    else if(sc.type==="colors"){L.params[sc.name]=v;E.append(field(sc.label,"ПКМ по цвету — удалить",colorList(v,save)))}
-    else if(sc.type==="select"){const s=document.createElement("select");sc.options.forEach(([o,t])=>s.add(new Option(t,o,false,v===o)));
-      s.onchange=()=>{L.params[sc.name]=s.value;save()};E.append(field(sc.label,null,s))}}
-  const rs=document.createElement("button");rs.textContent="Сбросить параметры";rs.onclick=()=>{L.params=L.effect==="paint"?{colors:L.params.colors}:{};save();drawEditor()};E.append(rs)}
+    if(sc.type==="range")E.append(field(t(sc.label),v,rangeInput(v,sc.min,sc.max,sc.step,x=>{L.params[sc.name]=x;save()},x=>x)));
+    else if(sc.type==="color"){const c=document.createElement("input");c.type="color";c.value=v;c.oninput=()=>{L.params[sc.name]=c.value;save()};E.append(field(t(sc.label),null,c))}
+    else if(sc.type==="colors"){L.params[sc.name]=v;E.append(field(t(sc.label),t("Right-click a color to remove"),colorList(v,save)))}
+    else if(sc.type==="select"){const s=document.createElement("select");sc.options.forEach(([o,n])=>s.add(new Option(t(n),o,false,v===o)));
+      s.onchange=()=>{L.params[sc.name]=s.value;save()};E.append(field(t(sc.label),null,s))}}
+  const rs=document.createElement("button");rs.textContent=t("Reset parameters");rs.onclick=()=>{L.params=L.effect==="paint"?{colors:L.params.colors}:{};save();drawEditor()};E.append(rs)}
 
 $("add").onclick=()=>{const e=$("addfx").value;const L={id:Math.random().toString(16).slice(2,10),effect:e,enabled:true,keys:["all"],opacity:1,
   blend:FX[e].reactive?"add":"normal",params:{}};P.layers.push(L);cur=L.id;save();drawLayers();drawEditor()};
 
-// ---------- общее ----------
+// ---------- global ----------
 function drawGlobal(){
   document.querySelectorAll("#mode button").forEach(b=>b.classList.toggle("on",b.dataset.m===(P.mode||"custom")));
   $("kb").classList.toggle("hwmode",P.mode==="hardware");$("bright").value=P.brightness??1;$("brightv").textContent=Math.round((P.brightness??1)*100)+"%"}
 document.querySelectorAll("#mode button").forEach(b=>b.onclick=()=>{P.mode=b.dataset.m;save();drawGlobal()});
 $("bright").oninput=()=>{P.brightness=+$("bright").value;$("brightv").textContent=Math.round(P.brightness*100)+"%";save()};
 
+function drawFxList(){const s=$("addfx"),v=s.value;s.innerHTML="";Object.values(FX).forEach(f=>s.add(new Option(t(f.title)+(f.reactive?" ⚡":""),f.id)));if(v)s.value=v}
+function applyLang(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{el.dataset.src??=el.textContent;el.textContent=t(el.dataset.src)});
+  document.querySelectorAll("#lang button").forEach(b=>b.classList.toggle("on",b.dataset.l===lang));
+  if(S){drawFxList();drawLayers();drawEditor();drawSel();refreshPresets()}}
+document.querySelectorAll("#lang button").forEach(b=>b.onclick=()=>{lang=b.dataset.l;try{localStorage.setItem(LANGKEY,lang)}catch(e){}applyLang()});
+
 function setProfile(p){P=p;cur=P.layers.at(-1)?.id;drawGlobal();drawLayers();drawEditor()}
-async function refreshPresets(){const l=(await api("/api/presets")).presets;const s=$("presets");s.innerHTML="";
-  if(!l.length)s.add(new Option("— нет сохранённых —",""));l.forEach(n=>s.add(new Option(n,n)))}
-$("psave").onclick=async()=>{const n=prompt("Название профиля:",$("presets").value||"Мой профиль");if(!n)return;
-  await api("/api/presets/save",{name:n,profile:P});await refreshPresets();$("presets").value=n;toast("Сохранено: "+n)};
-$("pload").onclick=async()=>{const n=$("presets").value;if(!n)return;const r=await api("/api/presets/load",{name:n});setProfile(r.profile);toast("Загружен: "+n)};
-$("pdel").onclick=async()=>{const n=$("presets").value;if(!n||!confirm(`Удалить профиль «${n}»?`))return;await api("/api/presets/delete",{name:n});refreshPresets()};
+async function refreshPresets(){const l=(await api("/api/presets")).presets;const s=$("presets"),v=s.value;s.innerHTML="";
+  if(!l.length)s.add(new Option(t("— no saved profiles —"),""));l.forEach(n=>s.add(new Option(n,n)));if(l.includes(v))s.value=v}
+$("psave").onclick=async()=>{const n=prompt(t("Profile name:"),$("presets").value||t("My profile"));if(!n)return;
+  await api("/api/presets/save",{name:n,profile:P});await refreshPresets();$("presets").value=n;toast(t("Saved: {n}",n))};
+$("pload").onclick=async()=>{const n=$("presets").value;if(!n)return;const r=await api("/api/presets/load",{name:n});setProfile(r.profile);toast(t("Loaded: {n}",n))};
+$("pdel").onclick=async()=>{const n=$("presets").value;if(!n||!confirm(t("Delete profile “{n}”?",n)))return;await api("/api/presets/delete",{name:n});refreshPresets()};
 $("export").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(P,null,1)],{type:"application/json"}));a.download="hyperx-profile.json";a.click()};
 $("import").onclick=()=>$("file").click();
-$("file").onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());await api("/api/profile",p);setProfile(p);toast("Импортировано")}catch(err){toast("Не удалось прочитать файл")}e.target.value=""};
+$("file").onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());await api("/api/profile",p);setProfile(p);toast(t("Imported"))}catch(err){toast(t("Could not read the file"))}e.target.value=""};
 
 let U;
+applyLang();
 (async()=>{S=await api("/api/state");U=S.unit;
-  S.effects.forEach(f=>{FX[f.id]=f;$("addfx").add(new Option(f.title+(f.reactive?" ⚡":""),f.id))});
+  S.effects.forEach(f=>FX[f.id]=f);drawFxList();
   S.resolve=keys=>keys.flatMap(k=>S.groups[k]??S.lamps.filter(l=>l.name===k).map(l=>l.id));
   buildKeys();setProfile(S.profile);refreshPresets();pollFrame()})();
 </script></body></html>"""
@@ -366,9 +444,9 @@ class App:
 
     def set_profile(self, profile):
         if not isinstance(profile, dict) or not isinstance(profile.get("layers"), list):
-            raise ValueError("некорректный профиль")
+            raise ValueError("invalid profile")
         self.engine.set_profile(profile)
-        if self.kb.path != "demo":
+        if not isinstance(self.kb, DemoKeyboard):
             fx.save_profile(profile)
 
 
@@ -387,13 +465,14 @@ def make_handler(app):
             self.wfile.write(data)
 
         def do_GET(self):
-            if self.path == "/":
+            path = urlsplit(self.path).path
+            if path == "/":
                 self._send(200, PAGE, "text/html")
-            elif self.path == "/api/state":
+            elif path == "/api/state":
                 self._send(200, app.state())
-            elif self.path == "/api/frame":
+            elif path == "/api/frame":
                 self._send(200, app.frame())
-            elif self.path == "/api/presets":
+            elif path == "/api/presets":
                 self._send(200, {"presets": list_presets()})
             else:
                 self._send(404, "not found", "text/plain")
