@@ -25,8 +25,8 @@
 ## Установка
 
 ```sh
-git clone git@github.com:dvaxert/hyper_ctl.git ~/workspace/hyper_ctl
-cd ~/workspace/hyper_ctl
+git clone git@github.com:dvaxert/hyper_ctl.git
+cd hyper_ctl
 ```
 
 Дать доступ к клавиатуре без root (udev-правило):
@@ -56,18 +56,24 @@ python3 hyper_ui.py --demo     # без клавиатуры, посмотрет
 - для остальных слоёв «Выделенные» ограничивает эффект выделенными клавишами
 - ПКМ по цвету в списке цветов — удалить цвет
 
-### Фоновый режим (systemd)
+### Установка как сервис (рекомендуется)
 
-Эффекты рассчитываются на компьютере, поэтому для постоянной работы нужен сервис:
+Эффекты рассчитываются на компьютере, поэтому для постоянной работы нужен фоновый сервис:
 
 ```sh
-mkdir -p ~/.config/systemd/user
-cp hyper-ctl.service ~/.config/systemd/user/   # путь к hyper_ui.py внутри — поправь, если клонировал не в ~/workspace
-systemctl --user enable --now hyper-ctl
+./install.sh      # копирует программу в ~/.local/share/hyper_ctl и включает systemd user service
 ```
 
-UI при этом всегда доступен на http://127.0.0.1:8075/. При остановке сервиса подсветка возвращается
-к встроенным эффектам клавиатуры.
+После этого репозиторий можно удалить. UI всегда доступен на http://127.0.0.1:8075/,
+сервис стартует при входе в систему. При остановке подсветка возвращается к встроенным эффектам клавиатуры.
+
+Обновление — `git pull && ./install.sh`. Удаление — `./uninstall.sh` (профили в `~/.config/hyper_ctl` остаются).
+
+```sh
+systemctl --user restart hyper-ctl     # перезапустить
+systemctl --user stop hyper-ctl        # остановить
+journalctl --user -u hyper-ctl -f      # логи
+```
 
 ### CLI
 
@@ -91,7 +97,8 @@ python3 hyper_ctl.py run [profile.json]       # проигрывать проф�
 | `effects.py` | движок: слои, смешивание, эффекты, чтение нажатий для реактивных эффектов |
 | `hyper_ui.py` | HTTP-сервер на stdlib + одностраничный UI |
 | `70-hyperx.rules` | udev-правило доступа |
-| `hyper-ctl.service` | systemd user unit |
+| `hyper-ctl.service` | шаблон systemd user unit (путь подставляет `install.sh`) |
+| `install.sh` / `uninstall.sh` | установка в `~/.local/share/hyper_ctl` + сервис / удаление |
 
 Новый эффект — это класс в `effects.py` с декоратором `@effect`, описанием параметров в `SCHEMA`
 (UI сам построит форму) и методом `render(t, dt, ids)`, возвращающим `{lamp_id: (r, g, b, alpha)}`.
