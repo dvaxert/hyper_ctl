@@ -7,7 +7,7 @@
 
 Чистый Python 3.8+, без зависимостей: общение с клавиатурой идёт напрямую через `/dev/hidraw*` (ioctl).
 
-![](https://img.shields.io/badge/python-3.8%2B-blue) ![](https://img.shields.io/badge/deps-none-green) ![](https://img.shields.io/badge/platform-linux-lightgrey)
+![](https://img.shields.io/badge/python-3.8%2B-blue) ![](https://img.shields.io/badge/deps-none-green) ![](https://img.shields.io/badge/platform-linux-lightgrey) [![](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 ![Веб-интерфейс hyper_ctl](docs/screenshot.ru.png)
 
@@ -151,3 +151,7 @@ LampCount с мусором после 96-й лампы — это учитыв�
 ремап клавиш, макросы, запись эффектов и профилей во внутреннюю память клавиатуры, настройка
 датчика освещённости. Ремап и макросы можно сделать на стороне Linux, например через
 [keyd](https://github.com/rvaiya/keyd).
+
+## Лицензия
+
+[MIT](LICENSE)

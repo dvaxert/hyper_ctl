@@ -7,7 +7,7 @@ Works with any keyboard that implements the **HID LampArray** standard.
 
 Pure Python 3.8+, no dependencies: talks to the keyboard directly through `/dev/hidraw*` (ioctl).
 
-![](https://img.shields.io/badge/python-3.8%2B-blue) ![](https://img.shields.io/badge/deps-none-green) ![](https://img.shields.io/badge/platform-linux-lightgrey)
+![](https://img.shields.io/badge/python-3.8%2B-blue) ![](https://img.shields.io/badge/deps-none-green) ![](https://img.shields.io/badge/platform-linux-lightgrey) [![](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 ![hyper_ctl web UI](docs/screenshot.png)
 
@@ -151,3 +151,7 @@ Key presses for reactive effects are read from the keyboard's hidraw nodes along
 key remapping, macros, storing effects and profiles in the keyboard's onboard memory, ambient light
 sensor settings. Remapping and macros can be done on the Linux side, e.g. with
 [keyd](https://github.com/rvaiya/keyd).
+
+## License
+
+[MIT](LICENSE)
