@@ -1,10 +1,10 @@
 #!/bin/sh
-# Удаляет сервис и программу. Профили в ~/.config/hyper_ctl остаются.
+# Удаляет сервис, программу из /opt и udev-правило. Настройки в ~/.config/hyper_ctl остаются.
 set -e
-DEST="${XDG_DATA_HOME:-$HOME/.local/share}/hyper_ctl"
-UNIT="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/hyper-ctl.service"
+PREFIX="${PREFIX:-/opt/hyper_ctl}"
 systemctl --user disable --now hyper-ctl 2>/dev/null || true
-rm -f "$UNIT"
+sudo rm -f /etc/systemd/user/hyper-ctl.service /etc/udev/rules.d/70-hyperx.rules
+sudo rm -rf "$PREFIX"
+sudo udevadm control --reload
 systemctl --user daemon-reload
-rm -rf "$DEST"
-echo "Удалено. Профили остались в ~/.config/hyper_ctl, udev-правило — в /etc/udev/rules.d/70-hyperx.rules"
+echo "Удалено. Настройки остались в ~/.config/hyper_ctl"

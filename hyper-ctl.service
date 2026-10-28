@@ -2,7 +2,8 @@
 Description=HyperX RGB effects (hyper_ctl)
 
 [Service]
-ExecStart=/usr/bin/python3 @DEST@/hyper_ui.py --no-browser
+ExecStart=/usr/bin/python3 @PREFIX@/hyper_ui.py --no-browser
+Environment=PYTHONDONTWRITEBYTECODE=1
 Restart=on-failure
 RestartSec=3
 

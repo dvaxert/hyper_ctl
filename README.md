@@ -29,15 +29,25 @@ git clone git@github.com:dvaxert/hyper_ctl.git
 cd hyper_ctl
 ```
 
-Дать доступ к клавиатуре без root (udev-правило):
+Установить в `/opt/hyper_ctl` и включить фоновый сервис (спросит пароль sudo):
 
 ```sh
-sudo cp 70-hyperx.rules /etc/udev/rules.d/
-sudo udevadm control --reload && sudo udevadm trigger
+./install.sh
 ```
 
-> Номер `70-` важен: тег `uaccess` обрабатывается в `73-seat-late.rules`, правило должно идти раньше.
-> Для другой клавиатуры поменяй `idVendor`/`idProduct` в правиле (смотри `lsusb`).
+Скрипт копирует программу в `/opt/hyper_ctl`, ставит udev-правило доступа к клавиатуре без root
+и systemd user unit в `/etc/systemd/user/`, затем включает сервис для текущего пользователя.
+После этого репозиторий можно удалить.
+
+- обновление: `git pull && ./install.sh`
+- удаление: `./uninstall.sh`
+- другой путь установки: `PREFIX=/usr/local/lib/hyper_ctl ./install.sh`
+
+> udev-правило называется `70-…` неслучайно: тег `uaccess` обрабатывается в `73-seat-late.rules`,
+> правило должно идти раньше. Для другой клавиатуры поменяй `idVendor`/`idProduct` (смотри `lsusb`).
+
+**Настройки** хранятся в `~/.config/hyper_ctl/`: текущий профиль — `profile.json`, именованные профили —
+`profiles/*.json`. Установка и удаление их не трогают.
 
 ## Использование
 
@@ -48,26 +58,19 @@ python3 hyper_ui.py            # откроет http://127.0.0.1:8075/
 python3 hyper_ui.py --demo     # без клавиатуры, посмотреть интерфейс
 ```
 
-Пока UI запущен, он же крутит эффекты. Текущий профиль сохраняется автоматически в
-`~/.config/hyper_ctl/profile.json`, именованные профили — в `~/.config/hyper_ctl/profiles/`.
+При установке через `install.sh` UI всегда доступен на http://127.0.0.1:8075/ (его обслуживает сервис),
+запускать `hyper_ui.py` вручную не нужно. Изменения в UI сохраняются сразу.
 
 - клик / Shift+клик / протяжка мышью — выделить клавиши
 - слой «Ручная раскраска»: выделить клавиши → «Покрасить выделенные» (или двойной клик по клавише)
 - для остальных слоёв «Выделенные» ограничивает эффект выделенными клавишами
 - ПКМ по цвету в списке цветов — удалить цвет
 
-### Установка как сервис (рекомендуется)
+### Сервис
 
-Эффекты рассчитываются на компьютере, поэтому для постоянной работы нужен фоновый сервис:
-
-```sh
-./install.sh      # копирует программу в ~/.local/share/hyper_ctl и включает systemd user service
-```
-
-После этого репозиторий можно удалить. UI всегда доступен на http://127.0.0.1:8075/,
-сервис стартует при входе в систему. При остановке подсветка возвращается к встроенным эффектам клавиатуры.
-
-Обновление — `git pull && ./install.sh`. Удаление — `./uninstall.sh` (профили в `~/.config/hyper_ctl` остаются).
+Эффекты рассчитываются на компьютере, поэтому их крутит фоновый сервис. Он стартует при входе в систему
+и сам находит клавиатуру после сна или переподключения. При остановке подсветка возвращается
+к встроенным эффектам клавиатуры.
 
 ```sh
 systemctl --user restart hyper-ctl     # перезапустить
@@ -78,12 +81,12 @@ journalctl --user -u hyper-ctl -f      # логи
 ### CLI
 
 ```sh
-python3 hyper_ctl.py info                     # список ламп, имена клавиш, координаты
-python3 hyper_ctl.py color ff0000             # залить всё
-python3 hyper_ctl.py key 00ff00 wasd esc f1   # отдельные клавиши / группы
-python3 hyper_ctl.py off                      # погасить
-python3 hyper_ctl.py auto                     # вернуть встроенные эффекты клавиатуры
-python3 hyper_ctl.py run [profile.json]       # проигрывать профиль без UI
+python3 /opt/hyper_ctl/hyper_ctl.py info                     # список ламп, имена клавиш, координаты
+python3 /opt/hyper_ctl/hyper_ctl.py color ff0000             # залить всё
+python3 /opt/hyper_ctl/hyper_ctl.py key 00ff00 wasd esc f1   # отдельные клавиши / группы
+python3 /opt/hyper_ctl/hyper_ctl.py off                      # погасить
+python3 /opt/hyper_ctl/hyper_ctl.py auto                     # вернуть встроенные эффекты клавиатуры
+python3 /opt/hyper_ctl/hyper_ctl.py run [profile.json]       # проигрывать профиль без UI
 ```
 
 Группы: `all`, `keys`, `letters`, `digits`, `fkeys`, `arrows`, `wasd`, `mods`, `space`, `lbar`, `rbar`, `bars`.
@@ -98,7 +101,7 @@ python3 hyper_ctl.py run [profile.json]       # проигрывать проф�
 | `hyper_ui.py` | HTTP-сервер на stdlib + одностраничный UI |
 | `70-hyperx.rules` | udev-правило доступа |
 | `hyper-ctl.service` | шаблон systemd user unit (путь подставляет `install.sh`) |
-| `install.sh` / `uninstall.sh` | установка в `~/.local/share/hyper_ctl` + сервис / удаление |
+| `install.sh` / `uninstall.sh` | установка в `/opt/hyper_ctl` + udev + сервис / удаление |
 
 Новый эффект — это класс в `effects.py` с декоратором `@effect`, описанием параметров в `SCHEMA`
 (UI сам построит форму) и методом `render(t, dt, ids)`, возвращающим `{lamp_id: (r, g, b, alpha)}`.
